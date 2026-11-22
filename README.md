@@ -18,18 +18,29 @@ Set the project root directory to `frontend` and add:
 
 ### Railway backend
 
-Set the service root directory to `backend`. Configure the existing mail, Supabase API, and rate
-limit variables on this service. This tester additionally requires:
+Set the service root directory to `backend`. Configure these server-only variables on this service:
+
+| Variable | Purpose |
+| --- | --- |
+| `BREVO_API_KEY` | Brevo v3 API key (used with the `api-key` header); do not use an SMTP key |
+| `BREVO_SENDER_EMAIL` | Sender address verified in Brevo |
+| `SUPABASE_URL` | Supabase project URL, if used by the API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key, if used by the API |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SEC` | API rate-limit settings |
+
+The connection tester additionally requires:
 
 | Variable | Purpose |
 | --- | --- |
 | `TESTER_TOKEN` | Random operator-only token required for email and database test actions |
 | `SUPABASE_DB_URL` | Supabase Postgres connection URI, kept only on Railway |
 
-Get the Postgres connection URI from Supabase **Project Settings → Database**. Use a connection
-option reachable from Railway and keep TLS enabled. Configure `FRONTEND_URL` with the exact Vercel
-origin (no trailing slash). For preview deployments, a comma-separated list of allowed origins is
-supported.
+For `SUPABASE_DB_URL`, copy the URI from Supabase **Connect → Session pooler**. Railway may not be
+able to reach Supabase's direct IPv6 database endpoint; the shared session pooler is reachable over
+IPv4 and uses port `5432`. Copy the displayed host and username exactly, replace the password, and
+percent-encode reserved characters in the password. Keep TLS enabled. Configure `FRONTEND_URL` with
+the exact Vercel origin (no trailing slash). For preview deployments, a comma-separated list of
+allowed origins is supported.
 
 Generate `TESTER_TOKEN` locally, then paste it directly into Railway Variables; do not commit it or
 put it in a `VITE_` variable. For example, run this locally:
