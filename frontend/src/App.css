@@ -121,7 +121,7 @@ input {
 
 .overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -221,6 +221,83 @@ input {
 
 .database-card {
   grid-column: 1 / -1;
+}
+
+.checker-card {
+  margin-bottom: 16px;
+}
+
+.claim-input {
+  height: auto;
+  min-height: 100px;
+  padding: 10px 11px;
+  resize: vertical;
+}
+
+.fact-check-result {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e8ebf2;
+  border-radius: 10px;
+  background: #f8f9fc;
+  color: #536076;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.fact-check-result > p {
+  margin: 10px 0 0;
+}
+
+.fact-check-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8791a3;
+  font-size: 11px;
+}
+
+.verdict {
+  color: #526078;
+  text-transform: capitalize;
+}
+
+.verdict.supported {
+  color: #19805d;
+}
+
+.verdict.unsupported {
+  color: #bd4d4d;
+}
+
+.verdict.mixed,
+.verdict.unverified {
+  color: #9a6d1e;
+}
+
+.source-list {
+  margin-top: 13px;
+}
+
+.source-list > strong {
+  color: #59657b;
+  font-size: 11px;
+}
+
+.source-list ul {
+  display: grid;
+  gap: 5px;
+  margin: 7px 0 0;
+  padding-left: 18px;
+}
+
+.source-list a {
+  color: #5a4bc4;
+  overflow-wrap: anywhere;
+}
+
+.source-note {
+  color: #8791a3;
 }
 
 .card-heading {

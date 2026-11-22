@@ -8,6 +8,7 @@ import {
   LockKeyhole,
   Mail,
   Plus,
+  SearchCheck,
   Server,
   ShieldCheck,
   Trash2,
@@ -15,10 +16,28 @@ import {
 } from 'lucide-react'
 import './App.css'
 
-type TestId = 'railway' | 'email' | 'supabase' | 'createTable' | 'deleteTable'
+type TestId =
+  | 'railway'
+  | 'email'
+  | 'supabase'
+  | 'createTable'
+  | 'deleteTable'
+  | 'factCheck'
+  | 'rateLimit'
 type TestState = 'idle' | 'running' | 'success' | 'error'
 type TestResult = { state: TestState; message: string }
-type Readiness = { testerAuth: boolean; email: boolean; supabaseDatabase: boolean }
+type Readiness = {
+  testerAuth: boolean
+  email: boolean
+  gemini: boolean
+  supabaseDatabase: boolean
+}
+type FactCheck = {
+  verdict: 'supported' | 'mixed' | 'unsupported' | 'unverified'
+  confidence: number
+  explanation: string
+  sources: { title: string; url: string }[]
+}
 
 const initialResults: Record<TestId, TestResult> = {
   railway: { state: 'idle', message: '' },
@@ -26,12 +45,28 @@ const initialResults: Record<TestId, TestResult> = {
   supabase: { state: 'idle', message: '' },
   createTable: { state: 'idle', message: '' },
   deleteTable: { state: 'idle', message: '' },
+  factCheck: { state: 'idle', message: '' },
+  rateLimit: { state: 'idle', message: '' },
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
+const rateLimitTestMaxRequests = 75
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isFactCheck(value: Record<string, unknown>): value is Record<string, unknown> & FactCheck {
+  return (
+    ['supported', 'mixed', 'unsupported', 'unverified'].includes(String(value.verdict)) &&
+    typeof value.confidence === 'number' &&
+    typeof value.explanation === 'string' &&
+    Array.isArray(value.sources) &&
+    value.sources.every(
+      (source) =>
+        isRecord(source) && typeof source.title === 'string' && typeof source.url === 'string',
+    )
+  )
 }
 
 function ResultMessage({ result }: { result: TestResult }) {
@@ -53,6 +88,8 @@ function ResultMessage({ result }: { result: TestResult }) {
 function App() {
   const [testerToken, setTesterToken] = useState('')
   const [recipient, setRecipient] = useState('')
+  const [claim, setClaim] = useState('')
+  const [factCheck, setFactCheck] = useState<FactCheck | null>(null)
   const [readiness, setReadiness] = useState<Readiness | null>(null)
   const [results, setResults] = useState(initialResults)
 
@@ -154,9 +191,111 @@ function App() {
       setReadiness({
         testerAuth: currentReadiness.testerAuth === true,
         email: currentReadiness.email === true,
+        gemini: currentReadiness.gemini === true,
         supabaseDatabase: currentReadiness.supabaseDatabase === true,
       })
     }
+  }
+
+  async function checkClaim() {
+    setFactCheck(null)
+    setResults((current) => ({
+      ...current,
+      factCheck: { state: 'running', message: 'Checking claim with Gemini…' },
+    }))
+
+    try {
+      const payload = await requestApi(
+        '/api/fact-checks',
+        'POST',
+        { claim: claim.trim() },
+        false,
+      )
+      if (!isFactCheck(payload)) {
+        throw new Error('Railway returned an unexpected fact-check response')
+      }
+
+      setFactCheck(payload)
+      setResults((current) => ({
+        ...current,
+        factCheck: { state: 'success', message: 'Fact-check complete' },
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The fact-check failed'
+      setResults((current) => ({
+        ...current,
+        factCheck: { state: 'error', message },
+      }))
+    }
+  }
+
+  async function testRateLimit() {
+    if (!apiBaseUrl) {
+      setResults((current) => ({
+        ...current,
+        rateLimit: { state: 'error', message: 'VITE_API_URL is missing from this Vercel deployment' },
+      }))
+      return
+    }
+
+    setResults((current) => ({
+      ...current,
+      rateLimit: { state: 'running', message: 'Sending request 1…' },
+    }))
+
+    for (let requestCount = 1; requestCount <= rateLimitTestMaxRequests; requestCount += 1) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/health`)
+
+        if (response.status === 429) {
+          setResults((current) => ({
+            ...current,
+            rateLimit: {
+              state: 'success',
+              message: `Rate limiting works: HTTP 429 received on request ${requestCount} (${requestCount} requests sent).`,
+            },
+          }))
+          return
+        }
+
+        if (!response.ok) {
+          setResults((current) => ({
+            ...current,
+            rateLimit: {
+              state: 'error',
+              message: `Unexpected HTTP ${response.status} on request ${requestCount}; unable to confirm rate limiting.`,
+            },
+          }))
+          return
+        }
+
+        setResults((current) => ({
+          ...current,
+          rateLimit: {
+            state: 'running',
+            message: `Sending requests… ${requestCount}/${rateLimitTestMaxRequests}`,
+          },
+        }))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'The request failed'
+        setResults((current) => ({
+          ...current,
+          rateLimit: {
+            state: 'error',
+            message: `Request ${requestCount} failed before a 429 response: ${message}`,
+          },
+        }))
+        return
+      }
+    }
+
+    setResults((current) => ({
+      ...current,
+      rateLimit: {
+        state: 'error',
+        message: `No rate limit detected: all ${rateLimitTestMaxRequests} requests succeeded without HTTP 429.`,
+      },
+    }))
   }
 
   async function sendTestEmail() {
@@ -231,6 +370,14 @@ function App() {
             <StatusDot state={readiness?.email ? 'success' : 'idle'} />
           </article>
           <article className="overview-card">
+            <div className="overview-icon violet"><SearchCheck size={18} /></div>
+            <div>
+              <span className="overview-label">GEMINI AI</span>
+              <strong>{readiness?.gemini ? 'Configured' : 'Not checked'}</strong>
+            </div>
+            <StatusDot state={readiness?.gemini ? 'success' : 'idle'} />
+          </article>
+          <article className="overview-card">
             <div className="overview-icon green"><Database size={18} /></div>
             <div>
               <span className="overview-label">SUPABASE DATABASE</span>
@@ -254,7 +401,89 @@ function App() {
           </article>
         </section>
 
+        <section className="test-card checker-card" aria-labelledby="fact-check-heading">
+          <div className="card-heading">
+            <div className="card-icon violet"><SearchCheck size={19} /></div>
+            <div>
+              <h2 id="fact-check-heading">Check a claim</h2>
+              <p>Ask Gemini to evaluate a factual claim using Google Search grounding.</p>
+            </div>
+          </div>
+          <label className="field-label" htmlFor="claim">Claim to check</label>
+          <textarea
+            id="claim"
+            className="text-input claim-input"
+            maxLength={1000}
+            placeholder="Enter a factual claim…"
+            value={claim}
+            onChange={(event) => setClaim(event.target.value)}
+          />
+          <ResultMessage result={results.factCheck} />
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={checkClaim}
+            disabled={claim.trim().length < 10 || results.factCheck.state === 'running'}
+          >
+            {results.factCheck.state === 'running' ? <Spinner /> : <SearchCheck size={16} />}
+            Check claim
+          </button>
+          {factCheck && (
+            <div className="fact-check-result" aria-live="polite">
+              <div className="fact-check-summary">
+                <strong className={`verdict ${factCheck.verdict}`}>{factCheck.verdict}</strong>
+                <span>{Math.round(factCheck.confidence * 100)}% confidence</span>
+              </div>
+              <p>{factCheck.explanation}</p>
+              {factCheck.sources.length > 0 ? (
+                <div className="source-list">
+                  <strong>Grounded sources</strong>
+                  <ul>
+                    {factCheck.sources.map((source) => (
+                      <li key={source.url}>
+                        <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="source-note">Gemini did not return verifiable source links.</p>
+              )}
+              <p className="safe-note">
+                AI-generated assessment; verify important claims with the linked sources.
+              </p>
+            </div>
+          )}
+        </section>
+
         <section className="tester-grid">
+          <article className="test-card">
+            <div className="card-heading">
+              <div className="card-icon violet"><ShieldCheck size={19} /></div>
+              <div>
+                <h2>API rate limit</h2>
+                <p>Send up to {rateLimitTestMaxRequests} lightweight health checks and stop on HTTP 429.</p>
+              </div>
+            </div>
+            <div className="endpoint">
+              <span className="endpoint-method">GET</span>
+              <code>{apiBaseUrl || 'Set VITE_API_URL on Vercel'}/api/health</code>
+            </div>
+            <ResultMessage result={results.rateLimit} />
+            <button
+              className="button button-primary"
+              type="button"
+              onClick={testRateLimit}
+              disabled={results.rateLimit.state === 'running'}
+            >
+              {results.rateLimit.state === 'running' ? <Spinner /> : <ShieldCheck size={16} />}
+              Test rate limit
+            </button>
+            <p className="safe-note">
+              Shares your IP’s API quota; other API requests may be rate limited until the window resets.
+            </p>
+          </article>
+
           <article className="test-card">
             <div className="card-heading">
               <div className="card-icon violet"><Server size={19} /></div>
