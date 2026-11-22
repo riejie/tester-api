@@ -28,7 +28,8 @@ Set the service root directory to `backend`. Configure these server-only variabl
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key, if used by the API |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SEC` | API rate-limit settings |
 | `GEMINI_API_KEY` | Server-only Gemini API key for the claim checker |
-| `GEMINI_MODEL` | Optional Gemini model override (defaults to `gemini-2.5-flash`) |
+| `GEMINI_MODEL` | Optional Gemini model override (defaults to `gemini-3.5-flash-lite`) |
+| `TAVILY_API_KEY` | Server-only Tavily API key used to retrieve web evidence for the claim checker |
 
 The connection tester additionally requires:
 

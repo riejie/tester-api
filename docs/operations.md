@@ -12,7 +12,8 @@ deployment. For ongoing monitoring, create read-only HTTPS GET monitors for:
 
 Use a 5-minute interval, a 10-second timeout, and alert after two consecutive failures. Configure a
 recovery notification as well. If the monitoring service supports JSON assertions, also require
-`readiness.testerAuth`, `readiness.email`, `readiness.gemini`, and `readiness.supabaseDatabase` to
+`readiness.testerAuth`, `readiness.email`, `readiness.gemini`, `readiness.tavily`, and
+`readiness.supabaseDatabase` to
 be `true`.
 
 The readiness values indicate that required configuration is present; they do not prove Gemini,

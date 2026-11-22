@@ -39,6 +39,7 @@ test('health endpoint reports service readiness and deployment commit', async ()
       'email',
       'gemini',
       'supabaseDatabase',
+      'tavily',
       'testerAuth',
     ])
   } finally {
@@ -50,9 +51,11 @@ test('health endpoint reports service readiness and deployment commit', async ()
   }
 })
 
-test('fact-check endpoint validates claims and reports missing Gemini configuration', async () => {
+test('fact-check endpoint validates claims and reports missing Tavily configuration', async () => {
   const originalApiKey = process.env.GEMINI_API_KEY
+  const originalTavilyApiKey = process.env.TAVILY_API_KEY
   delete process.env.GEMINI_API_KEY
+  delete process.env.TAVILY_API_KEY
 
   try {
     const invalidResponse = await fetch(`${baseUrl}/api/fact-checks`, {
@@ -70,7 +73,7 @@ test('fact-check endpoint validates claims and reports missing Gemini configurat
 
     assert.equal(response.status, 503)
     assert.deepEqual(await response.json(), {
-      error: 'GEMINI_API_KEY is not configured on Railway',
+      error: 'TAVILY_API_KEY is not configured on Railway',
     })
   } finally {
     if (originalApiKey === undefined) {
@@ -78,20 +81,73 @@ test('fact-check endpoint validates claims and reports missing Gemini configurat
     } else {
       process.env.GEMINI_API_KEY = originalApiKey
     }
+    if (originalTavilyApiKey === undefined) {
+      delete process.env.TAVILY_API_KEY
+    } else {
+      process.env.TAVILY_API_KEY = originalTavilyApiKey
+    }
   }
 })
 
 test('fact-check endpoint returns Gemini quota errors as 429 with retry guidance', async () => {
   const originalApiKey = process.env.GEMINI_API_KEY
+  const originalTavilyApiKey = process.env.TAVILY_API_KEY
   const originalFetch = globalThis.fetch
   process.env.GEMINI_API_KEY = 'ci-only-test-key'
+  process.env.TAVILY_API_KEY = 'ci-only-tavily-key'
   globalThis.fetch = async (input, init) => {
+    if (String(input) === 'https://api.tavily.com/search') {
+      return new Response(JSON.stringify({ results: [] }), { status: 200 })
+    }
     if (String(input).startsWith('https://generativelanguage.googleapis.com/')) {
       return new Response(JSON.stringify({
         error: { code: 429, message: 'Resource exhausted' },
       }), {
         status: 429,
         headers: { 'retry-after': '30' },
+      })
+
+      test('fact-check endpoint returns Tavily quota errors as 429 with retry guidance', async () => {
+        const originalGeminiApiKey = process.env.GEMINI_API_KEY
+        const originalTavilyApiKey = process.env.TAVILY_API_KEY
+        const originalFetch = globalThis.fetch
+        process.env.GEMINI_API_KEY = 'ci-only-gemini-key'
+        process.env.TAVILY_API_KEY = 'ci-only-tavily-key'
+        globalThis.fetch = async (input, init) => {
+          if (String(input) === 'https://api.tavily.com/search') {
+            return new Response(JSON.stringify({ error: 'rate limited' }), {
+              status: 429,
+              headers: { 'retry-after': '15' },
+            })
+          }
+          return originalFetch(input, init)
+        }
+
+        try {
+          const response = await originalFetch(`${baseUrl}/api/fact-checks`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ claim: 'The Earth orbits the Sun.' }),
+          })
+
+          assert.equal(response.status, 429)
+          assert.equal(response.headers.get('retry-after'), '15')
+          assert.deepEqual(await response.json(), {
+            error: 'Tavily search quota or rate limit was reached (HTTP 429).',
+          })
+        } finally {
+          globalThis.fetch = originalFetch
+          if (originalGeminiApiKey === undefined) {
+            delete process.env.GEMINI_API_KEY
+          } else {
+            process.env.GEMINI_API_KEY = originalGeminiApiKey
+          }
+          if (originalTavilyApiKey === undefined) {
+            delete process.env.TAVILY_API_KEY
+          } else {
+            process.env.TAVILY_API_KEY = originalTavilyApiKey
+          }
+        }
       })
     }
 
@@ -116,6 +172,11 @@ test('fact-check endpoint returns Gemini quota errors as 429 with retry guidance
       delete process.env.GEMINI_API_KEY
     } else {
       process.env.GEMINI_API_KEY = originalApiKey
+    }
+    if (originalTavilyApiKey === undefined) {
+      delete process.env.TAVILY_API_KEY
+    } else {
+      process.env.TAVILY_API_KEY = originalTavilyApiKey
     }
   }
 })
