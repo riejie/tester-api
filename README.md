@@ -1,8 +1,8 @@
 # Social Platform connection tester
 
-This prototype checks the deployed Vercel frontend, Railway API, Brevo email, and Supabase
-Postgres connection. Provider credentials stay on Railway; the browser only receives the API URL
-and a tester token entered by the operator.
+This prototype checks the deployed Vercel frontend, Railway API, Gemini-powered claim checker,
+Brevo email, and Supabase Postgres connection. Provider credentials stay on Railway; the browser
+only receives the API URL and a tester token entered by the operator.
 
 ## Deployment configuration
 
@@ -27,6 +27,8 @@ Set the service root directory to `backend`. Configure these server-only variabl
 | `SUPABASE_URL` | Supabase project URL, if used by the API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key, if used by the API |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SEC` | API rate-limit settings |
+| `GEMINI_API_KEY` | Server-only Gemini API key for the claim checker |
+| `GEMINI_MODEL` | Optional Gemini model override (defaults to `gemini-3.5-flash-lite`) |
 
 The connection tester additionally requires:
 
@@ -56,8 +58,10 @@ Railway builds with `npm run build` and starts with `npm start`.
 Open the deployed Vercel site and:
 
 1. Select **Check API connection** to test the browser-to-Railway request and CORS.
-2. Enter the Railway `TESTER_TOKEN` and a recipient, then select **Send test email**.
-3. Check Supabase Postgres, then create or delete the dedicated
+2. Enter a factual claim in **Check a claim** to get Gemini's grounded assessment and source links.
+   The checker uses the API's configured rate limit and does not require the tester token.
+3. Enter the Railway `TESTER_TOKEN` and a recipient, then select **Send test email**.
+4. Check Supabase Postgres, then create or delete the dedicated
    `public.social_platform_connection_smoke_test` table.
 
 The table actions accept no table name from the browser and are protected by `TESTER_TOKEN`.
@@ -89,9 +93,9 @@ in GitHub Actions.
 
 ## Tests and smoke checks (Phase 2)
 
-The backend CI job runs `npm test` for route-level checks that use an ephemeral local server and do
-not contact Brevo or Supabase. The tests cover the health response, tester-token rejection, and
-email validation before provider access.
+The backend CI job runs `npm test` for route-level and Gemini-adapter checks that do not contact
+Gemini, Brevo, or Supabase. The tests cover the health response, tester-token rejection, claim
+validation, grounded-source parsing, and the configured API rate limit.
 
 Railway's existing deployment health check probes `/api/health` on each new backend deployment
 before marking it active. The endpoint reports `RAILWAY_GIT_COMMIT_SHA` as `version` when deployed

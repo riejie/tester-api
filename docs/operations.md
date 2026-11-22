@@ -12,12 +12,13 @@ deployment. For ongoing monitoring, create read-only HTTPS GET monitors for:
 
 Use a 5-minute interval, a 10-second timeout, and alert after two consecutive failures. Configure a
 recovery notification as well. If the monitoring service supports JSON assertions, also require
-`readiness.testerAuth`, `readiness.email`, and `readiness.supabaseDatabase` to be `true`.
+`readiness.testerAuth`, `readiness.email`, `readiness.gemini`, and `readiness.supabaseDatabase` to
+be `true`.
 
-The readiness values indicate that required configuration is present; they do not prove Brevo or
-Supabase is reachable. Do not have an uptime monitor call the protected integration endpoints, send
-test email, or create/delete the Supabase smoke-test table. Run those checks manually from the
-operator UI when investigating an integration issue.
+The readiness values indicate that required configuration is present; they do not prove Gemini,
+Brevo, or Supabase is reachable. Do not have an uptime monitor call the protected integration
+endpoints, send test email, or create/delete the Supabase smoke-test table. Run those checks
+manually from the operator UI when investigating an integration issue.
 
 Use [Railway service metrics](https://docs.railway.com/observability/metrics) and deployment logs
 to investigate backend resource use and crashes. Use [Vercel deployment details and runtime

@@ -4,7 +4,7 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import apiRoutes from './routes/index.js'
 
-function parsePositiveInteger(value: string | undefined, fallback: number): number {
+function parsePositiveInteger(value: string | number | undefined, fallback: number): number {
   if (value === undefined) {
     return fallback
   }
@@ -30,55 +30,75 @@ if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.add('https://tester-it48sy49m-tester-1f8d.vercel.app')
 }
 
-const app = express()
+type AppOptions = {
+  rateLimitMax?: number
+  rateLimitWindowMs?: number
+}
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
-        callback(null, true)
+export function createApp(options: AppOptions = {}) {
+  const windowMs =
+    options.rateLimitWindowMs ??
+    parsePositiveInteger(process.env.RATE_LIMIT_WINDOW_SEC, 60) * 1000
+  const limit = parsePositiveInteger(options.rateLimitMax ?? process.env.RATE_LIMIT_MAX, 60)
+  parsePositiveInteger(windowMs, 60_000)
+
+  const app = express()
+
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.has(origin)) {
+          callback(null, true)
+          return
+        }
+
+        callback(new Error('Origin is not allowed by CORS'))
+      },
+    }),
+  )
+  app.use(helmet())
+  app.use(express.json({ limit: '16kb' }))
+  app.use(
+    rateLimit({
+      windowMs,
+      limit,
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler(_request, response) {
+        response.status(429).json({ error: 'Too many requests, please try again later' })
+      },
+    }),
+  )
+  app.use('/api', apiRoutes)
+
+  app.use(
+    (
+      error: Error & { status?: number; type?: string },
+      _request: express.Request,
+      response: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      if (response.headersSent) {
         return
       }
 
-      callback(new Error('Origin is not allowed by CORS'))
+      if (error.type === 'entity.parse.failed') {
+        response.status(400).json({ error: 'Request body must be valid JSON' })
+        return
+      }
+
+      if (error.message === 'Origin is not allowed by CORS') {
+        response.status(403).json({ error: error.message })
+        return
+      }
+
+      response.status(error.status ?? 500).json({ error: 'The API could not process the request' })
     },
-  }),
-)
-app.use(helmet())
-app.use(express.json({ limit: '16kb' }))
-app.use(
-  rateLimit({
-    windowMs: parsePositiveInteger(process.env.RATE_LIMIT_WINDOW_SEC, 60) * 1000,
-    limit: parsePositiveInteger(process.env.RATE_LIMIT_MAX, 60),
-    standardHeaders: true,
-    legacyHeaders: false,
-  }),
-)
-app.use('/api', apiRoutes)
+  )
 
-app.use(
-  (
-    error: Error & { status?: number; type?: string },
-    _request: express.Request,
-    response: express.Response,
-    _next: express.NextFunction,
-  ) => {
-    if (response.headersSent) {
-      return
-    }
+  return app
+}
 
-    if (error.type === 'entity.parse.failed') {
-      response.status(400).json({ error: 'Request body must be valid JSON' })
-      return
-    }
-
-    if (error.message === 'Origin is not allowed by CORS') {
-      response.status(403).json({ error: error.message })
-      return
-    }
-
-    response.status(error.status ?? 500).json({ error: 'The API could not process the request' })
-  },
-)
+const app = createApp()
 
 export default app

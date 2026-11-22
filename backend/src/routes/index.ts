@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { Router, type Request, type Response } from 'express'
 import { z } from 'zod'
+import { checkClaim, GeminiConfigurationError } from '../integrations/ai/gemini.js'
 import {
   ConfigurationError,
   createTestTable,
@@ -12,6 +13,7 @@ import {
 
 const router = Router()
 const emailRequest = z.object({ to: z.string().email().max(254) })
+const factCheckRequest = z.object({ claim: z.string().trim().min(10).max(1000) })
 
 function isValidTesterToken(expected: string, provided: string | undefined): boolean {
   if (!provided) {
@@ -52,7 +54,8 @@ function requireTesterToken(
 
 function sendIntegrationError(response: Response, error: unknown): void {
   const message = error instanceof Error ? error.message : 'Unknown integration error'
-  const status = error instanceof ConfigurationError ? 503 : 502
+  const status =
+    error instanceof ConfigurationError || error instanceof GeminiConfigurationError ? 503 : 502
   response.status(status).json({ error: message })
 }
 
@@ -63,6 +66,20 @@ router.get('/health', (_request, response) => {
     version: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
     readiness: getReadiness(),
   })
+})
+
+router.post('/fact-checks', async (request, response) => {
+  const parsed = factCheckRequest.safeParse(request.body)
+  if (!parsed.success) {
+    response.status(400).json({ error: 'Enter a claim between 10 and 1000 characters' })
+    return
+  }
+
+  try {
+    response.json(await checkClaim(parsed.data.claim))
+  } catch (error) {
+    sendIntegrationError(response, error)
+  }
 })
 
 router.post('/test/email', requireTesterToken, async (request, response) => {
