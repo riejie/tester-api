@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { checkClaim } from '../src/integrations/ai/gemini.js'
+import {
+  checkClaim,
+  GeminiRateLimitError,
+} from '../src/integrations/ai/gemini.js'
 
 test('Gemini fact-check uses grounded sources and validates the model response', async () => {
   const originalApiKey = process.env.GEMINI_API_KEY
@@ -42,6 +45,39 @@ test('Gemini fact-check uses grounded sources and validates the model response',
       url: 'https://example.com/evidence',
     }])
     assert.ok(Array.isArray(requestBody?.tools))
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalApiKey === undefined) {
+      delete process.env.GEMINI_API_KEY
+    } else {
+      process.env.GEMINI_API_KEY = originalApiKey
+    }
+  }
+})
+
+test('Gemini quota errors explain the likely cause and preserve the retry delay', async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY
+  const originalFetch = globalThis.fetch
+  process.env.GEMINI_API_KEY = 'test-gemini-key'
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({
+      error: { code: 429, message: 'Resource exhausted' },
+    }), {
+      status: 429,
+      headers: { 'retry-after': '30' },
+    })
+
+  try {
+    await assert.rejects(
+      checkClaim('The Earth orbits the Sun.'),
+      (error: unknown) => {
+        assert.ok(error instanceof GeminiRateLimitError)
+        assert.equal(error.retryAfterSeconds, 30)
+        assert.match(error.message, /quota or rate limit/)
+        assert.match(error.message, /Google AI Studio quota and billing/)
+        return true
+      },
+    )
   } finally {
     globalThis.fetch = originalFetch
     if (originalApiKey === undefined) {

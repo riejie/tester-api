@@ -1,7 +1,11 @@
 import { timingSafeEqual } from 'node:crypto'
 import { Router, type Request, type Response } from 'express'
 import { z } from 'zod'
-import { checkClaim, GeminiConfigurationError } from '../integrations/ai/gemini.js'
+import {
+  checkClaim,
+  GeminiConfigurationError,
+  GeminiRateLimitError,
+} from '../integrations/ai/gemini.js'
 import {
   ConfigurationError,
   createTestTable,
@@ -55,7 +59,14 @@ function requireTesterToken(
 function sendIntegrationError(response: Response, error: unknown): void {
   const message = error instanceof Error ? error.message : 'Unknown integration error'
   const status =
-    error instanceof ConfigurationError || error instanceof GeminiConfigurationError ? 503 : 502
+    error instanceof GeminiRateLimitError
+      ? 429
+      : error instanceof ConfigurationError || error instanceof GeminiConfigurationError
+        ? 503
+        : 502
+  if (error instanceof GeminiRateLimitError && error.retryAfterSeconds !== undefined) {
+    response.setHeader('Retry-After', error.retryAfterSeconds)
+  }
   response.status(status).json({ error: message })
 }
 

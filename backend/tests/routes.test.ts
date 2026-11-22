@@ -81,6 +81,45 @@ test('fact-check endpoint validates claims and reports missing Gemini configurat
   }
 })
 
+test('fact-check endpoint returns Gemini quota errors as 429 with retry guidance', async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY
+  const originalFetch = globalThis.fetch
+  process.env.GEMINI_API_KEY = 'ci-only-test-key'
+  globalThis.fetch = async (input, init) => {
+    if (String(input).startsWith('https://generativelanguage.googleapis.com/')) {
+      return new Response(JSON.stringify({
+        error: { code: 429, message: 'Resource exhausted' },
+      }), {
+        status: 429,
+        headers: { 'retry-after': '30' },
+      })
+    }
+
+    return originalFetch(input, init)
+  }
+
+  try {
+    const response = await originalFetch(`${baseUrl}/api/fact-checks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ claim: 'The Earth orbits the Sun.' }),
+    })
+
+    assert.equal(response.status, 429)
+    assert.equal(response.headers.get('retry-after'), '30')
+    assert.deepEqual(await response.json(), {
+      error: 'Gemini quota or rate limit was reached (HTTP 429). Check Google AI Studio quota and billing for the API-key project.',
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalApiKey === undefined) {
+      delete process.env.GEMINI_API_KEY
+    } else {
+      process.env.GEMINI_API_KEY = originalApiKey
+    }
+  }
+})
+
 test('rate limiter returns HTTP 429 after the configured request limit', async () => {
   const limitedServer = createApp({ rateLimitMax: 2 }).listen(0)
   await once(limitedServer, 'listening')

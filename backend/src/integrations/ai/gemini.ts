@@ -17,6 +17,14 @@ export type FactCheckResult = {
 
 export class GeminiConfigurationError extends Error {}
 
+export class GeminiRateLimitError extends Error {
+  constructor(readonly retryAfterSeconds?: number) {
+    super(
+      'Gemini quota or rate limit was reached (HTTP 429). Check Google AI Studio quota and billing for the API-key project.',
+    )
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -127,6 +135,13 @@ export async function checkClaim(claim: string): Promise<FactCheckResult> {
   )
 
   if (!response.ok) {
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('retry-after')
+      const retryAfterSeconds =
+        retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : undefined
+      throw new GeminiRateLimitError(retryAfterSeconds)
+    }
+
     throw new Error(`Gemini rejected the fact-check request (HTTP ${response.status})`)
   }
 
