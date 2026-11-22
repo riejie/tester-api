@@ -352,6 +352,32 @@ function App() {
           </p>
         </section>
 
+        <section className="auth-panel">
+          <div className="auth-icon"><LockKeyhole size={18} /></div>
+          <div className="auth-copy">
+            <h2>Tester access</h2>
+            <p>
+              Enter the <code>TESTER_TOKEN</code> configured on Railway. It stays in this page’s
+              memory and is sent only to your API.
+            </p>
+          </div>
+          <div className="auth-input-wrap">
+            <input
+              className="text-input token-input"
+              type="password"
+              autoComplete="off"
+              aria-label="Tester token"
+              placeholder="Enter tester token"
+              value={testerToken}
+              onChange={(event) => setTesterToken(event.target.value)}
+            />
+            <span className={`token-state ${testerConfigured ? 'ready' : ''}`}>
+              <span className="badge-dot" />
+              {testerConfigured ? 'API configured' : 'Check API first'}
+            </span>
+          </div>
+        </section>
+
         <section className="overview" aria-label="Connection status">
           <article className="overview-card">
             <div className="overview-icon violet"><Server size={18} /></div>
@@ -587,32 +613,6 @@ function App() {
               Delete is limited to this named smoke-test table and asks for confirmation.
             </p>
           </article>
-        </section>
-
-        <section className="auth-panel">
-          <div className="auth-icon"><LockKeyhole size={18} /></div>
-          <div className="auth-copy">
-            <h2>Tester access</h2>
-            <p>
-              Enter the <code>TESTER_TOKEN</code> configured on Railway. It stays in this page’s
-              memory and is sent only to your API.
-            </p>
-          </div>
-          <div className="auth-input-wrap">
-            <input
-              className="text-input token-input"
-              type="password"
-              autoComplete="off"
-              aria-label="Tester token"
-              placeholder="Enter tester token"
-              value={testerToken}
-              onChange={(event) => setTesterToken(event.target.value)}
-            />
-            <span className={`token-state ${testerConfigured ? 'ready' : ''}`}>
-              <span className="badge-dot" />
-              {testerConfigured ? 'API configured' : 'Check API first'}
-            </span>
-          </div>
         </section>
 
         <footer className="page-footer">
