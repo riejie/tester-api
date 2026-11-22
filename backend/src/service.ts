@@ -6,6 +6,19 @@ export class ConfigurationError extends Error {}
 
 let databasePool: Pool | undefined
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function providerErrorText(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const text = value.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 160)
+  return text || undefined
+}
+
 function getDatabasePool(): Pool {
   const connectionString = process.env.SUPABASE_DB_URL
   if (!connectionString) {
@@ -64,8 +77,26 @@ export async function sendTestEmail(to: string): Promise<void> {
   })
 
   if (!response.ok) {
+    let providerDetails: string[] = []
+    try {
+      const payload: unknown = await response.json()
+      if (isRecord(payload)) {
+        const message = providerErrorText(payload.message)
+        const code = providerErrorText(payload.code)
+        providerDetails = [
+          ...(message ? [message] : []),
+          ...(code ? [`code: ${code}`] : []),
+        ]
+      }
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) {
+        throw error
+      }
+    }
+
+    const detail = providerDetails.length > 0 ? `: ${providerDetails.join(' — ')}` : ''
     throw new Error(
-      `Brevo rejected the test email (HTTP ${response.status}). Check the API key, verified sender, and recipient.`,
+      `Brevo rejected the test email (HTTP ${response.status})${detail}. Check that Railway has a valid API v3 key for the correct Brevo account.`,
     )
   }
 }
