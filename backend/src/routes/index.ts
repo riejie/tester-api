@@ -7,6 +7,10 @@ import {
   GeminiRateLimitError,
 } from '../integrations/ai/gemini.js'
 import {
+  TavilyConfigurationError,
+  TavilyRateLimitError,
+} from '../integrations/ai/tavily.js'
+import {
   ConfigurationError,
   createTestTable,
   deleteTestTable,
@@ -59,12 +63,17 @@ function requireTesterToken(
 function sendIntegrationError(response: Response, error: unknown): void {
   const message = error instanceof Error ? error.message : 'Unknown integration error'
   const status =
-    error instanceof GeminiRateLimitError
+    error instanceof GeminiRateLimitError || error instanceof TavilyRateLimitError
       ? 429
-      : error instanceof ConfigurationError || error instanceof GeminiConfigurationError
+      : error instanceof ConfigurationError ||
+          error instanceof GeminiConfigurationError ||
+          error instanceof TavilyConfigurationError
         ? 503
         : 502
-  if (error instanceof GeminiRateLimitError && error.retryAfterSeconds !== undefined) {
+  if (
+    (error instanceof GeminiRateLimitError || error instanceof TavilyRateLimitError) &&
+    error.retryAfterSeconds !== undefined
+  ) {
     response.setHeader('Retry-After', error.retryAfterSeconds)
   }
   response.status(status).json({ error: message })

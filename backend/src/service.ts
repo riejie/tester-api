@@ -51,6 +51,7 @@ export function getReadiness() {
     testerAuth: Boolean(process.env.TESTER_TOKEN),
     email: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
     gemini: Boolean(process.env.GEMINI_API_KEY),
+    tavily: Boolean(process.env.TAVILY_API_KEY),
     supabaseDatabase: Boolean(process.env.SUPABASE_DB_URL),
   }
 }
