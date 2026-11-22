@@ -1,4 +1,4 @@
-# Social Platform Hackathon Starter
+# Connection Starter
 
 A small, deployable foundation for a hackathon project, with a React frontend, Express API, CI,
 and optional Brevo and Supabase connectivity checks. Use it to validate that your services can
