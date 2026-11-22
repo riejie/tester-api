@@ -28,7 +28,7 @@ Set the service root directory to `backend`. Configure these server-only variabl
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key, if used by the API |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SEC` | API rate-limit settings |
 | `GEMINI_API_KEY` | Server-only Gemini API key for the claim checker |
-| `GEMINI_MODEL` | Optional Gemini model override (defaults to `gemini-3.5-flash-lite`) |
+| `GEMINI_MODEL` | Optional Gemini model override (defaults to `gemini-2.5-flash`) |
 
 The connection tester additionally requires:
 
@@ -58,6 +58,8 @@ Railway builds with `npm run build` and starts with `npm start`.
 Open the deployed Vercel site and:
 
 1. Select **Check API connection** to test the browser-to-Railway request and CORS.
+   Select **Test rate limit** to send up to 75 lightweight health checks, stopping when the API
+   returns HTTP 429. This shares the same per-IP quota as other API requests.
 2. Enter a factual claim in **Check a claim** to get Gemini's grounded assessment and source links.
    The checker uses the API's configured rate limit and does not require the tester token.
 3. Enter the Railway `TESTER_TOKEN` and a recipient, then select **Send test email**.

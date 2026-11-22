@@ -11,7 +11,7 @@ test('Gemini fact-check uses grounded sources and validates the model response',
   let requestBody: Record<string, unknown> | undefined
   process.env.GEMINI_API_KEY = 'test-gemini-key'
   globalThis.fetch = async (input, init) => {
-    assert.match(String(input), /models\/gemini-3\.5-flash-lite:generateContent$/)
+    assert.match(String(input), /models\/gemini-2\.5-flash:generateContent$/)
     assert.equal(new Headers(init?.headers).get('x-goog-api-key'), 'test-gemini-key')
     requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
 

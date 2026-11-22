@@ -104,7 +104,7 @@ export async function checkClaim(claim: string): Promise<FactCheckResult> {
     throw new GeminiConfigurationError('GEMINI_API_KEY is not configured on Railway')
   }
 
-  const model = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite'
+  const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
