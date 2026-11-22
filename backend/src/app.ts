@@ -27,7 +27,6 @@ const allowedOrigins = new Set(
 
 if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.add('http://localhost:5173')
-  allowedOrigins.add('https://tester-it48sy49m-tester-1f8d.vercel.app')
 }
 
 const app = express()

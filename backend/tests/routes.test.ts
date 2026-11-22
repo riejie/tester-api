@@ -49,6 +49,18 @@ test('health endpoint reports service readiness and deployment commit', async ()
   }
 })
 
+test('CORS allows the local frontend and rejects unconfigured origins', async () => {
+  const allowedResponse = await fetch(`${baseUrl}/api/health`, {
+    headers: { origin: 'http://localhost:5173' },
+  })
+  assert.equal(allowedResponse.headers.get('access-control-allow-origin'), 'http://localhost:5173')
+
+  const rejectedResponse = await fetch(`${baseUrl}/api/health`, {
+    headers: { origin: 'https://example.com' },
+  })
+  assert.equal(rejectedResponse.status, 403)
+})
+
 test('integration endpoints reject missing and invalid tester tokens', async () => {
   const originalToken = process.env.TESTER_TOKEN
   process.env.TESTER_TOKEN = 'ci-only-test-token'
