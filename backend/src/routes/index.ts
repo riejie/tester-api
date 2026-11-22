@@ -60,6 +60,7 @@ router.get('/health', (_request, response) => {
   response.json({
     ok: true,
     service: 'social-platform-api',
+    version: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
     readiness: getReadiness(),
   })
 })

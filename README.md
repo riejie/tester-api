@@ -63,6 +63,49 @@ Open the deployed Vercel site and:
 The table actions accept no table name from the browser and are protected by `TESTER_TOKEN`.
 Deleting requires browser confirmation and only drops that dedicated smoke-test table.
 
+## CI (Phase 0)
+
+GitHub Actions runs on pull requests and pushes to `main`. It installs dependencies from each
+package lockfile, builds the backend, and lints and builds the frontend. These checks need no
+deployment credentials.
+
+## CD (Phase 1)
+
+Use the existing provider Git integrations for deployment rather than adding a second deploy
+pipeline in GitHub Actions. This avoids duplicate builds and keeps provider credentials out of
+GitHub. Configure both production services to deploy from `main`, then enable the provider-side CI
+gates:
+
+- **Railway:** In the backend service settings, set the GitHub trigger branch to `main` and enable
+  **Wait for CI**. Railway will skip the deployment if a GitHub Actions workflow on that commit
+  fails.
+- **Vercel:** Set `main` as the production branch. In the project's **Deployment Checks** settings,
+  add the GitHub Actions checks **Backend build** and **Frontend lint and build**. Vercel will hold
+  the production deployment from reaching the production domain until those checks pass.
+
+The GitHub workflow only runs CI for pushes to `main` and pull requests. Vercel preview deployments
+for other branches remain managed by Vercel. No deployment tokens or provider secrets are needed
+in GitHub Actions.
+
+## Tests and smoke checks (Phase 2)
+
+The backend CI job runs `npm test` for route-level checks that use an ephemeral local server and do
+not contact Brevo or Supabase. The tests cover the health response, tester-token rejection, and
+email validation before provider access.
+
+Railway's existing deployment health check probes `/api/health` on each new backend deployment
+before marking it active. The endpoint reports `RAILWAY_GIT_COMMIT_SHA` as `version` when deployed
+from GitHub, making the running backend revision visible. Vercel's Phase 1 Deployment Checks keep
+production promotion gated on CI. These provider-native checks avoid adding a workflow that could
+hold Railway's **Wait for CI** deployment gate open while waiting for the deployment itself.
+
+## Monitoring and recovery (Phase 3)
+
+Configure read-only uptime monitors for the production API and frontend, and follow the manual
+provider rollback steps in [docs/operations.md](./docs/operations.md). The runbook covers expected
+health responses, alert setup, investigation, and recovery. External monitor and alert accounts
+must be configured by an operator; no automatic rollback is configured.
+
 ## Local development
 
 Run the backend from `backend` with `npm run dev`, and the frontend from `frontend` with
